@@ -6,6 +6,7 @@ module UIUtils (
    ,items
    ,selected
    ,drawSelectionView
+   ,inGroupsOf
 )
 where
 
