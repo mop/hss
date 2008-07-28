@@ -10,6 +10,7 @@ import UI.HSCurses.Widgets
 
 import Control.Monad.State
 import Control.Exception
+import ConfigLoader
 import System
 
 -- The RssData of our application consists of their feeds (including their 
@@ -109,6 +110,11 @@ selectedItem rssFeeds feeds items = (Rss.items feed) !! selectedRssItem
             selectedRssItem = selected items
             feed            = (rssFeeds !! selectedFeed)
 
+
+-- Fetches Feeds from the internet
+refreshFeeds :: [Rss.RssFeed] -> IO [Rss.RssFeed]
+refreshFeeds = 
+
 mainloop :: [Rss.RssFeed] -> SelectionView -> SelectionView -> IO ()
 mainloop rssFeeds feeds items = do
     wclear stdScr
@@ -120,6 +126,7 @@ mainloop rssFeeds feeds items = do
     key <- getKey $ return ()
     (rssFeeds'', feeds', items'') <- case key of 
         KeyChar 'q' -> exitWith ExitSuccess
+        KeyChar 'r' -> return $ (refreshFeeds rssFeeds', feeds, items')
         KeyChar 'J' -> return $ moveFeedsDown feeds rssFeeds'
         KeyChar 'K' -> return $ moveFeedsUp feeds rssFeeds'
         KeyChar 'j' -> return (rssFeeds', feeds, selectionViewMoveDown items')
@@ -144,10 +151,23 @@ testFeeds = [
     Rss.newRssFeed "Railscasts"
         "http://feeds.feedburner.com/railscasts" railscastsItems ]
 
+
+safeGetRssItems :: [Rss.RssFeed] -> Rss.RssFeed
+safeGetRssItems feeds = if length feeds > 0 
+                            then head feeds
+                            else Rss.newRssFeed "" "" []
+
+dummyItems = (Rss.newRssItem "" "" "" False) : []
+
+makeSafe :: [Rss.RssFeed] -> [Rss.RssFeed]
+makeSafe [] = (Rss.newRssFeed "" "" dummyItems) : []
+makeSafe xs = xs
+
 main :: IO ()
 main = do
     start
     cursSet CursorInvisible
-    mainloop testFeeds (newFeedView testFeeds) (newItemView (testFeeds !! 0))
+    feeds <- loadFeeds
+    safeFeeds <- return $ makeSafe feeds
+    mainloop safeFeeds (newFeedView feeds) (newItemView $ safeFeeds !! 0)
     `finally` end
-

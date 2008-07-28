@@ -29,7 +29,7 @@ data RssItem = RssItem {
     content  :: Content,
     homepage :: URL,
     isRead   :: Bool
-} deriving (Show, Eq, Ord)
+} deriving (Show, Read, Eq, Ord)
 
 -- Sets the given item as read
 setRead :: RssItem -> Bool -> RssItem
@@ -41,7 +41,7 @@ data RssFeed = RssFeed {
     name    :: Title,
     url     :: URL,
     items   :: [RssItem]
-} deriving (Show, Eq, Ord)
+} deriving (Show, Read, Eq, Ord)
 
 -- Constructs a new RssFeed
 newRssFeed :: Title -> URL -> [RssItem] -> RssFeed
