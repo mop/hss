@@ -75,6 +75,7 @@ markRssItem feed position flag = newRssFeed (name feed) (url feed)
 -- isRead-Attribute
 -- Returns: A new RssFeed-list is returned
 markRssItemInFeed :: [RssFeed] -> Int -> Int -> Bool -> [RssFeed]
+markRssItemInFeed [] _ _ _ = []
 markRssItemInFeed feeds feedPos itemPos readFlag = newFeedList
     where   markedFeed  = markRssItem (feeds !! feedPos) itemPos readFlag
             newFeedList = findAndReplace (\x -> markedFeed) feeds feedPos

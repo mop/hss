@@ -43,10 +43,11 @@ fetchFeeds :: IO [Rss.RssFeed]
 fetchFeeds = do
     contents <- readFile feedListFile
     mapM fetchAndParse (lines contents)
-    where   fetchAndParse line = liftM parseFeed $ fetchFeed line
+    where   fetchAndParse line = (liftM myParse $ fetchFeed line)
+                where   myParse content = (parseFeed content) { Rss.url = line }
 
 -- Writes the RSS-files 
 writeFeeds :: [Rss.RssFeed] -> IO ()
 writeFeeds feeds = do 
-    writeFile feedFile (show feeds) 
-    writeFile feedListFile $ show $ map Rss.name feeds
+    writeFile feedFile (show feeds)
+    writeFile feedListFile $ unlines $ map Rss.url feeds
