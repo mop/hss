@@ -8,6 +8,7 @@ import Control.Exception
 
 import qualified ConfigLoader as Ql
 import System
+import StringPrettifier
 
 import qualified Rss
 
@@ -17,6 +18,7 @@ data StateData = StateData {
     feedsView     :: SelectionView,     -- The view for the feed-list
     itemsView     :: SelectionView,     -- The view for the items of the 
                                         -- selected feed
+    contentView   :: TextWidget,
 
     feedsPosition :: Pos,               -- The position of the feedsView
     feedsSize     :: Size,              -- The size of the feedsView
@@ -64,12 +66,8 @@ selectedItem state = case feeds of
 refreshContent :: RssState ()
 refreshContent = do
     state <- get
-    let selected = selectedItem state
-    case selected of 
-        Nothing -> return ()
-        Just item -> do
-            view <- contentView item 77
-            lift $ drawTextWidget (contentPosition state) 
+    let view = contentView state
+    lift $ drawTextWidget (contentPosition state) 
                 (contentSize state) DHNormal view
     return ()
 
@@ -115,23 +113,24 @@ newFeedsView [] _ = newSelectionView [] 0
 newFeedsView xs pos = newSelectionView (map feedsDesc xs) pos
     where feedsDesc = Rss.name
 
--- returns a text widget for the given Rss-Item and the given width
-contentView :: Rss.RssItem -> Int -> RssState TextWidget
-contentView item width = do 
-    return $ newTextWidget defaultTWOptions joinedContent
-        where   splittedContent = (Rss.content item) `inGroupsOf` width
-                joinedContent   = unlines splittedContent
+newContentView :: Maybe Rss.RssItem -> Int -> TextWidget
+newContentView Nothing _ = 
+    newTextWidget defaultTWOptions ""
+newContentView (Just item) width = 
+    newTextWidget defaultTWOptions $ prettify width (Rss.content item)
 
 -- Moves the list of feeds up or down depending on the given function. The
 -- function might be selectionViewMoveDown or selectionViewMoveUp
 moveFeeds :: (SelectionView -> SelectionView) -> RssState ()
 moveFeeds fun = do
     state <- get
-    let feedsView' = fun $ feedsView state 
-    let itemsView' = newItemsView (rssFeeds state) (selected feedsView')
+    let feedsView'   = fun $ feedsView state 
+    let itemsView'   = newItemsView (rssFeeds state) (selected feedsView')
+    let contentView' = newContentView (selectedItem state) (snd (contentSize state))
     put state {
-        feedsView = feedsView',
-        itemsView = itemsView'
+        feedsView   = feedsView',
+        itemsView   = itemsView',
+        contentView = contentView'
     }
 
 -- Moves the selection of the feeds-list down
@@ -147,8 +146,10 @@ moveItems :: (SelectionView -> SelectionView) -> RssState ()
 moveItems fun = do
     state <- get
     let itemsView' = fun (itemsView state)
+    let content = newContentView (selectedItem state) (snd (contentSize state))
     put state {
-        itemsView = itemsView'
+        itemsView = itemsView',
+        contentView = content
     }
 
 -- moves the selection of the items-list down
@@ -159,17 +160,45 @@ moveItemsDown = moveItems selectionViewMoveDown
 moveItemsUp :: RssState ()
 moveItemsUp = moveItems selectionViewMoveUp
 
+scrollContentDown :: RssState ()
+scrollContentDown = scrollContent textWidgetScrollDown
+
+scrollContentUp :: RssState ()
+scrollContentUp = scrollContent textWidgetScrollUp
+
+scrollContent :: (Size -> TextWidget -> TextWidget) -> RssState ()
+scrollContent fun = do
+    state <- get
+    let size     = contentSize state
+    let content  = contentView state
+    let content' = fun size content
+    put state {
+        contentView = content'
+    }
+
+-- TODO: make this work...
+resizer :: IO ()
+resizer = do
+    return ()
+--    endWin
+--    update
+--    refresh
+--    size <- scrSize
+--    wAddStr stdScr $ show size
+
 -- handles the input
 handleInput :: RssState ()
 handleInput = do
     state <- get
-    key <- lift (getKey $ return ())
+    key <- lift (getKey $ resizer)
     case key of 
         KeyChar 'r' -> fetchFeeds
         KeyChar 'J' -> moveFeedsDown
         KeyChar 'K' -> moveFeedsUp
         KeyChar 'j' -> moveItemsDown
         KeyChar 'k' -> moveItemsUp
+        KeyChar 'l' -> scrollContentDown
+        KeyChar 'h' -> scrollContentUp
         KeyChar 'q' -> do
                 lift (Ql.writeFeeds $ rssFeeds state) 
                 lift $ exitWith ExitSuccess
@@ -183,7 +212,7 @@ markSelected = do
     let itemsPos = selected $ itemsView state
     let feeds = Rss.markRssItemInFeed (rssFeeds state) feedsPos itemsPos True
     put state {
-        rssFeeds = feeds
+        rssFeeds    = feeds
     }
 
 -- here gets the actual work done
@@ -204,10 +233,16 @@ main = do
     start
     cursSet CursorInvisible
     feeds <- Ql.loadFeeds       -- load the feeds from the HD
+    let selected = if length feeds > 0
+                    then if length (Rss.items (feeds !! 0)) > 0
+                        then Just $ (Rss.items (feeds !! 0)) !! 0
+                        else Nothing
+                    else Nothing
     (_, state) <- runRssState StateData {
         rssFeeds = feeds,
         feedsView = newFeedsView feeds 0,
         itemsView = newItemsView feeds 0,
+        contentView = newContentView selected 77 ,
         feedsPosition = (0, 0),
         feedsSize = (20, 10),
         itemsPosition = (0, 25),
