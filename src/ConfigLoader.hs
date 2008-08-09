@@ -4,7 +4,6 @@ module ConfigLoader (
     ,writeFeeds
     ,mergeFeeds
     ,appendFeed
-    ,deleteFeed
 )
 where
 
@@ -13,6 +12,7 @@ import FeedParser
 import HTTPFetcher
 import Control.Monad
 import qualified Control.Exception as Ex
+import IO
 
 -- The file with the string of feeds
 feedListFile :: String
@@ -69,16 +69,7 @@ writeFeeds feeds = do
     writeFile feedFile (show feeds)
     writeFile feedListFile $ unlines $ map Rss.url feeds
 
+-- Appends a new feed to the fetch-feed-list
 appendFeed :: String -> IO ()
 appendFeed url = do
     appendFile feedListFile (url ++ "\n")
-
-deleteFeed :: String -> IO ()
-deleteFeed url = do
-    contents <- readFile feedListFile
-    putStrLn contents
-    putStrLn $ show $ filterList (lines contents)
-    putStrLn $ unlines $ filterList (lines contents)
-    writeFile feedListFile $ unlines (filterList (lines contents))
-    where   filterList :: [String] -> [String]
-            filterList = filter (\x -> x /= url) 

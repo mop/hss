@@ -184,6 +184,8 @@ scrollContent fun = do
 editWidget :: EditWidget
 editWidget = newEditWidget defaultEWOptions ""
 
+--- Creates a new feed
+--- It calls fetchFeeds to refetch the feeds
 createFeed :: RssState ()
 createFeed = do
     state <- get
@@ -195,15 +197,26 @@ createFeed = do
             fetchFeeds
         else return ()
 
+--- Deletes the selected feed and updates the state-monad
+--- It calls fetchFeeds to refetch the feeds
 deleteFeed :: RssState ()
 deleteFeed = do
     state <- get
     if length (rssFeeds state) > 0
         then do
-            let to_delete = (rssFeeds state) !! (selected $ feedsView state)
-            lift $ Ql.deleteFeed (Rss.url to_delete)
+            let pos = (selected $ feedsView state)
+            put state { 
+                rssFeeds = removeElementAt pos $ rssFeeds state
+            }
+            state' <- get
+            lift $ Ql.writeFeeds $ rssFeeds state'
             fetchFeeds
         else return()
+
+--- Removes the element at the given position.
+removeElementAt :: Int -> [a] -> [a]
+removeElementAt num list = fst split ++ (drop 1 $ snd split)
+    where   split = splitAt num list
 
 -- TODO: make this work... :(
 resizer :: IO ()
