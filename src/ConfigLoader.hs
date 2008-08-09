@@ -3,6 +3,8 @@ module ConfigLoader (
     ,fetchFeeds
     ,writeFeeds
     ,mergeFeeds
+    ,appendFeed
+    ,deleteFeed
 )
 where
 
@@ -27,9 +29,24 @@ mergeFeeds :: [Rss.RssFeed] -> [Rss.RssFeed] -> [Rss.RssFeed]
 mergeFeeds readFeeds newFeeds = foldr replaceFeeds [] newFeeds
     where   replaceFeeds x ys = if length oldItems == 0 
                                     then x : ys
-                                    else (head oldItems) : ys
+                                    else x { 
+                                        Rss.items = mergeItems 
+                                            (Rss.items oldItem) 
+                                            (Rss.items x) 
+                                    } : ys
                 where   oldItems    = filter sameTitle readFeeds
                         sameTitle y = Rss.name x == Rss.name y
+                        oldItem     = head oldItems
+
+--- Merges two Rss-Item-lists
+mergeItems :: [Rss.RssItem] -> [Rss.RssItem] -> [Rss.RssItem]
+mergeItems readItems newItems = foldr replaceItems [] newItems
+    where   replaceItems x ys = if length oldItems == 0 
+                                    then x : ys
+                                    else (head oldItems) : ys
+                where   oldItems    = filter sameTitle readItems
+                        sameTitle y = Rss.title x == Rss.title y
+
 
 -- Loads the cached Rss-Feeds from the harddisk
 loadFeeds :: IO [Rss.RssFeed]
@@ -51,3 +68,17 @@ writeFeeds :: [Rss.RssFeed] -> IO ()
 writeFeeds feeds = do 
     writeFile feedFile (show feeds)
     writeFile feedListFile $ unlines $ map Rss.url feeds
+
+appendFeed :: String -> IO ()
+appendFeed url = do
+    appendFile feedListFile (url ++ "\n")
+
+deleteFeed :: String -> IO ()
+deleteFeed url = do
+    contents <- readFile feedListFile
+    putStrLn contents
+    putStrLn $ show $ filterList (lines contents)
+    putStrLn $ unlines $ filterList (lines contents)
+    writeFile feedListFile $ unlines (filterList (lines contents))
+    where   filterList :: [String] -> [String]
+            filterList = filter (\x -> x /= url) 

@@ -89,7 +89,7 @@ fetchFeeds = do
     let feedsView'  = newFeedsView mergedFeeds $ selected $ feedsView state
     let itemsView'  = newItemsView mergedFeeds $ selected $ feedsView state
     put state {
-        rssFeeds  = Ql.mergeFeeds (rssFeeds state) fetchedFeeds,
+        rssFeeds  = mergedFeeds,
         feedsView = feedsView',
         itemsView = itemsView'
     }
@@ -100,7 +100,7 @@ fetchFeeds = do
 newItemsView :: [Rss.RssFeed] -> Int -> SelectionView
 newItemsView [] _ = newSelectionView [] 0
 newItemsView xs pos = newSelectionView (map itemsDesc (selectedItems)) 0
-    where   selectedItems = Rss.items (xs !! pos)
+    where   selectedItems  = Rss.items (xs !! pos)
             itemsDesc item = if Rss.isRead item 
                                 then Rss.title item
                                 else "+" ++ Rss.title item
@@ -110,8 +110,10 @@ newItemsView xs pos = newSelectionView (map itemsDesc (selectedItems)) 0
 -- the second parameter is the position which should be marked
 newFeedsView :: [Rss.RssFeed] -> Int -> SelectionView
 newFeedsView [] _ = newSelectionView [] 0
-newFeedsView xs pos = newSelectionView (map feedsDesc xs) pos
-    where feedsDesc = Rss.name
+newFeedsView xs pos = newSelectionView (map feedsDesc xs) safePos
+    where   feedsDesc = Rss.name
+            safePos | pos >= length xs = length xs - 1
+                    | otherwise        = pos
 
 newContentView :: Maybe Rss.RssItem -> Int -> TextWidget
 newContentView Nothing _ = 
@@ -176,7 +178,31 @@ scrollContent fun = do
         contentView = content'
     }
 
--- TODO: make this work...
+editWidget :: EditWidget
+editWidget = newEditWidget defaultEWOptions ""
+
+createFeed :: RssState ()
+createFeed = do
+    state <- get
+    let line = (fst $ contentPosition state) + (fst $ contentSize state) + 2
+    (_, s) <- lift (activateEditWidget resizer (line, 1) (1, 77) editWidget)
+    if s /= ""
+        then do
+            lift $ Ql.appendFeed s
+            fetchFeeds
+        else return ()
+
+deleteFeed :: RssState ()
+deleteFeed = do
+    state <- get
+    if length (rssFeeds state) > 0
+        then do
+            let to_delete = (rssFeeds state) !! (selected $ feedsView state)
+            lift $ Ql.deleteFeed (Rss.url to_delete)
+            fetchFeeds
+        else return()
+
+-- TODO: make this work... :(
 resizer :: IO ()
 resizer = do
     return ()
@@ -192,6 +218,8 @@ handleInput = do
     state <- get
     key <- lift (getKey $ resizer)
     case key of 
+        KeyChar 'a' -> createFeed
+        KeyChar 'x' -> deleteFeed
         KeyChar 'r' -> fetchFeeds
         KeyChar 'J' -> moveFeedsDown
         KeyChar 'K' -> moveFeedsUp

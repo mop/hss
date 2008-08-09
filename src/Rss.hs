@@ -77,8 +77,11 @@ markRssItem feed position flag = newRssFeed (name feed) (url feed)
 markRssItemInFeed :: [RssFeed] -> Int -> Int -> Bool -> [RssFeed]
 markRssItemInFeed [] _ _ _ = []
 markRssItemInFeed feeds feedPos itemPos readFlag = newFeedList
-    where   markedFeed  = markRssItem (feeds !! feedPos) itemPos readFlag
+    where   markedFeed  = markRssItem selectedFeed itemPos readFlag
             newFeedList = findAndReplace (\x -> markedFeed) feeds feedPos
+            selectedFeed = if feedPos >= (length feeds)
+                               then feeds !! ((length feeds) - 1)
+                               else feeds !! feedPos
 
 
 -- finds the item on the given position and applies the given function on it. A
